@@ -6,4 +6,6 @@ package main.database.dao;
 public interface ThreadDAO {
     int getCount();
     void truncateTable();
+
+    String details(String thread, String[] related);
 }

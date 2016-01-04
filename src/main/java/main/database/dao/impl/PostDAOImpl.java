@@ -4,6 +4,8 @@ import main.database.dao.PostDAO;
 import main.database.executor.TExecutor;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
@@ -40,5 +42,22 @@ public class PostDAOImpl implements PostDAO {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public int getCount(int threadId) {
+        try {
+            String query = "SELECT COUNT(*) FROM post WHERE thread = ?;";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                preparedStatement.setInt(1, threadId);
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    resultSet.next();
+                    return resultSet.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 }

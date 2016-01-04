@@ -99,7 +99,7 @@ public class UserDAOImpl implements UserDAO {
         return object.toString();
     }
 
-    private JsonArray getFollowers(String email) {
+    public JsonArray getFollowers(String email) {
         JsonArray array = new JsonArray();
         try {
             String query = "SELECT follower FROM follow WHERE followee = ?";
@@ -117,7 +117,7 @@ public class UserDAOImpl implements UserDAO {
         return array;
     }
 
-    private JsonArray getFollowing(String email) {
+    public JsonArray getFollowing(String email) {
         JsonArray array = new JsonArray();
         try {
             String query = "SELECT followee FROM follow WHERE follower = ?";
@@ -135,7 +135,7 @@ public class UserDAOImpl implements UserDAO {
         return array;
     }
 
-    private JsonArray getSubscriptions(String email) {
+    public JsonArray getSubscriptions(String email) {
         JsonArray array = new JsonArray();
         try {
             String query = "SELECT thread FROM subscribe WHERE user = ?";
@@ -192,14 +192,14 @@ public class UserDAOImpl implements UserDAO {
             queryBuilder.append(" AND u.id >= ?");
         }
         if (order != null) {
-            queryBuilder.append(" ORDER BY name ");
+            queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
                 case "asc": queryBuilder.append("ASC"); break;
                 case "desc": queryBuilder.append("DESC"); break;
                 default: queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY name DESC");
+            queryBuilder.append(" ORDER BY u.name DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
@@ -250,14 +250,14 @@ public class UserDAOImpl implements UserDAO {
             queryBuilder.append(" AND u.id >= ?");
         }
         if (order != null) {
-            queryBuilder.append(" ORDER BY name ");
+            queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
                 case "asc": queryBuilder.append("ASC"); break;
                 case "desc": queryBuilder.append("DESC"); break;
                 default: queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY name DESC");
+            queryBuilder.append(" ORDER BY u.name DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");

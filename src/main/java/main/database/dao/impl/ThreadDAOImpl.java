@@ -42,4 +42,9 @@ public class ThreadDAOImpl implements ThreadDAO {
             e.printStackTrace();
         }
     }
+
+    @Override
+    public String details(String thread, String[] related) {
+        return "{\"thread\": null}";
+    }
 }

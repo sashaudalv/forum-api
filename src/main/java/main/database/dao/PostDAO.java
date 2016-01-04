@@ -5,5 +5,8 @@ package main.database.dao;
  */
 public interface PostDAO {
     int getCount();
+
     void truncateTable();
+
+    int getCount(int threadId);
 }
