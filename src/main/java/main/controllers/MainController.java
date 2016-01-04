@@ -8,8 +8,8 @@ import main.database.dao.impl.ForumDAOImpl;
 import main.database.dao.impl.PostDAOImpl;
 import main.database.dao.impl.ThreadDAOImpl;
 import main.database.dao.impl.UserDAOImpl;
-import main.models.Clear;
-import main.models.Status;
+import main.models.SimpleMapResponse;
+import main.models.SimpleStringResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -44,21 +44,21 @@ public class MainController {
     }
 
     @RequestMapping(value = "/status", method = RequestMethod.GET)
-    public Status status() {
+    public SimpleMapResponse status() {
         Map<String, Integer> response = new HashMap<>();
         response.put("user",userDAO.getCount());
         response.put("thread", threadDAO.getCount());
         response.put("forum", forumDAO.getCount());
         response.put("post", postDAO.getCount());
-        return new Status(response);
+        return new SimpleMapResponse(response);
     }
 
     @RequestMapping(value = "/clear", method = RequestMethod.POST)
-    public Clear clear() {
+    public SimpleStringResponse clear() {
         userDAO.truncateTable();
         forumDAO.truncateTable();
         threadDAO.truncateTable();
         postDAO.truncateTable();
-        return new Clear();
+        return new SimpleStringResponse("\"OK\"");
     }
 }
