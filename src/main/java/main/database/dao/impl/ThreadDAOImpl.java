@@ -44,7 +44,12 @@ public class ThreadDAOImpl implements ThreadDAO {
     }
 
     @Override
-    public String details(String thread, String[] related) {
+    public String details(int threadId, String[] related) {
         return "{\"thread\": null}";
+    }
+
+    @Override
+    public String listPosts(int threadId, String since, Integer limit, String sort, String order) {
+        return "{\"posts\": \"in dev\"}";
     }
 }

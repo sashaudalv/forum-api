@@ -7,5 +7,7 @@ public interface ThreadDAO {
     int getCount();
     void truncateTable();
 
-    String details(String thread, String[] related);
+    String details(int threadId, String[] related);
+
+    String listPosts(int threadId, String since, Integer limit, String sort, String order);
 }

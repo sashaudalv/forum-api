@@ -171,7 +171,7 @@ public class ForumDAOImpl implements ForumDAO {
                             if (Arrays.asList(related).contains("thread")) {
                                 object.add("thread",
                                         new JsonParser().parse(
-                                                new ThreadDAOImpl(connection).details(object.get("thread").getAsString(), null)
+                                                new ThreadDAOImpl(connection).details(object.get("thread").getAsInt(), null)
                                         ).getAsJsonObject()
                                 );
                             }
