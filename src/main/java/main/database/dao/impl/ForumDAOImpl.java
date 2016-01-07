@@ -136,7 +136,8 @@ public class ForumDAOImpl implements ForumDAO {
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     while (resultSet.next()) {
                         JsonObject object = new JsonObject();
-                        object.addProperty("date", resultSet.getString("date"));
+                        String date = resultSet.getString("date");
+                        object.addProperty("date", date.substring(0, date.length() - 2));
                         int likes = resultSet.getInt("likes");
                         object.addProperty("likes", likes);
                         int dislikes = resultSet.getInt("dislikes");
@@ -223,7 +224,8 @@ public class ForumDAOImpl implements ForumDAO {
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     while (resultSet.next()) {
                         JsonObject object = new JsonObject();
-                        object.addProperty("date", resultSet.getString("date"));
+                        String date = resultSet.getString("date");
+                        object.addProperty("date", date.substring(0, date.length() - 2));
                         int likes = resultSet.getInt("likes");
                         object.addProperty("likes", likes);
                         int dislikes = resultSet.getInt("dislikes");
@@ -270,7 +272,7 @@ public class ForumDAOImpl implements ForumDAO {
         JsonArray array = new JsonArray();
 
         StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("SELECT u.* FROM user u ");
+        queryBuilder.append("SELECT DISTINCT u.* FROM user u ");
         queryBuilder.append("INNER JOIN post p ON u.email = p.user ");
         queryBuilder.append("WHERE p.forum = ?");
         if (sinceId != null) {

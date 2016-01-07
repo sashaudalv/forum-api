@@ -30,7 +30,13 @@ public class UserController {
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)
     public SimpleStringResponse create(@RequestBody String body){
-        return new SimpleStringResponse(userDAO.create(body));
+        String ret = userDAO.create(body);
+        if (ret == null) {
+            return new SimpleStringResponse(5);
+        } else {
+            return new SimpleStringResponse(ret);
+
+        }
     }
 
     @RequestMapping(value = "/details", method = RequestMethod.GET)

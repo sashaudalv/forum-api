@@ -47,7 +47,7 @@ public class PostDAOImpl implements PostDAO {
     @Override
     public int getCount(int threadId) {
         try {
-            String query = "SELECT COUNT(*) FROM post WHERE thread = ?;";
+            String query = "SELECT COUNT(*) FROM post WHERE thread = ? AND isDeleted = 0;";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setInt(1, threadId);
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
@@ -62,7 +62,7 @@ public class PostDAOImpl implements PostDAO {
     }
 
     @Override
-    public String create(String jsonString) {
+    public String create(String jsonString) { // TODO: MAKE IT WITH MATERIALIZED PATH
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
 
         if (!object.has("isApproved")) {
@@ -124,7 +124,8 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(1, postId);
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     resultSet.next();
-                    object.addProperty("date", resultSet.getString("date"));
+                    String date = resultSet.getString("date");
+                    object.addProperty("date", date.substring(0, date.length() - 2));
                     int likes = resultSet.getInt("likes");
                     object.addProperty("likes", likes);
                     int dislikes = resultSet.getInt("dislikes");
@@ -222,7 +223,7 @@ public class PostDAOImpl implements PostDAO {
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
 
         try {
-            String query = "UPDATE post SET isEdited = 1, message = ? WHERE id = ?";
+            String query = "UPDATE post SET message = ? WHERE id = ?";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, object.get("message").getAsString());
                 preparedStatement.setInt(2, object.get("post").getAsInt());

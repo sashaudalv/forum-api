@@ -16,6 +16,8 @@ import java.sql.SQLException;
  */
 public class UserDAOImpl implements UserDAO {
 
+    private static final int MYSQL_DUPLICATE_PK = 1062;
+
     private final Connection connection;
 
     public UserDAOImpl(Connection connection) {
@@ -51,21 +53,26 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public String create(String jsonString) {
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
+
         if (!object.has("isAnonymous")) {
             object.addProperty("isAnonymous", false);
         }
+
         try {
             String query = "INSERT INTO user (username, about, name, email, isAnonymous) VALUES (?,?,?,?,?)";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setString(1, object.get("username").getAsString());
-                preparedStatement.setString(2, object.get("about").getAsString());
-                preparedStatement.setString(3, object.get("name").getAsString());
+                preparedStatement.setString(1, object.get("username").isJsonNull() ? null : object.get("username").getAsString());
+                preparedStatement.setString(2, object.get("about").isJsonNull() ? null : object.get("about").getAsString());
+                preparedStatement.setString(3, object.get("name").isJsonNull() ? null : object.get("name").getAsString());
                 preparedStatement.setString(4, object.get("email").getAsString());
                 preparedStatement.setBoolean(5, object.get("isAnonymous").getAsBoolean());
                 preparedStatement.execute();
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            if (e.getErrorCode() == MYSQL_DUPLICATE_PK) {
+                return null;
+            }
         }
         return details(object.get("email").getAsString());
     }
@@ -194,9 +201,14 @@ public class UserDAOImpl implements UserDAO {
         if (order != null) {
             queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
             queryBuilder.append(" ORDER BY u.name DESC");
@@ -252,9 +264,14 @@ public class UserDAOImpl implements UserDAO {
         if (order != null) {
             queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
             queryBuilder.append(" ORDER BY u.name DESC");
@@ -309,9 +326,14 @@ public class UserDAOImpl implements UserDAO {
         if (order != null) {
             queryBuilder.append(" ORDER BY date ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
             queryBuilder.append(" ORDER BY date DESC");
@@ -333,7 +355,8 @@ public class UserDAOImpl implements UserDAO {
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     while (resultSet.next()) {
                         JsonObject object = new JsonObject();
-                        object.addProperty("date", resultSet.getString("date"));
+                        String date = resultSet.getString("date");
+                        object.addProperty("date", date.substring(0, date.length() - 2));
                         int likes = resultSet.getInt("likes");
                         object.addProperty("likes", likes);
                         int dislikes = resultSet.getInt("dislikes");
@@ -341,7 +364,7 @@ public class UserDAOImpl implements UserDAO {
                         object.addProperty("points", likes - dislikes);
                         object.addProperty("forum", resultSet.getString("forum"));
                         object.addProperty("message", resultSet.getString("message"));
-                        object.addProperty("parent", (Integer)resultSet.getObject("parent"));
+                        object.addProperty("parent", (Integer) resultSet.getObject("parent"));
                         object.addProperty("thread", resultSet.getInt("thread"));
                         object.addProperty("id", resultSet.getInt("id"));
                         object.addProperty("user", resultSet.getString("user"));

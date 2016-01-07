@@ -6,12 +6,22 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
  * alex on 03.01.16.
  */
 public class SimpleStringResponse {
-    private final int code = 0;
+    private final int code;
     private final String response;
 
     public SimpleStringResponse(String response) {
+        this(0, response);
+    }
+
+    public SimpleStringResponse(int errorCode) {
+        this(errorCode, "\"Error errorCode " + errorCode + '\"');
+    }
+
+    public SimpleStringResponse(int code, String response) {
+        this.code = code;
         this.response = response;
     }
+
 
     public int getCode() {
         return code;

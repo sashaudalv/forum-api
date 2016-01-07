@@ -34,6 +34,9 @@ public class PostController {
     @RequestMapping(value = "/details", method = RequestMethod.GET)
     public SimpleStringResponse details(@RequestParam(value = "post", required = true) int postId,
                                         @RequestParam(value = "related", required = false) String[] related){
+        if (postId < 1) {
+            return new SimpleStringResponse(1);
+        }
         return new SimpleStringResponse(postDAO.details(postId, related));
     }
 
