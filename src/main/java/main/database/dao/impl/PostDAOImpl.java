@@ -94,7 +94,11 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setString(4, object.get("user").getAsString());
                 preparedStatement.setString(5, object.get("forum").getAsString());
                 if (object.has("parent")) {
-                    preparedStatement.setInt(6, object.get("parent").getAsInt());
+                    if (object.get("parent").isJsonNull()) {
+                        preparedStatement.setObject(6, null);
+                    } else {
+                        preparedStatement.setInt(6, object.get("parent").getAsInt());
+                    }
                 } else {
                     preparedStatement.setObject(6, null);
                 }
@@ -115,7 +119,7 @@ public class PostDAOImpl implements PostDAO {
 
         String mPath = "";
 
-        if (object.has("parent")) {
+        if (object.has("parent") && !object.get("parent").isJsonNull()) {
             try {
                 String mPathQuery = "SELECT mpath FROM post WHERE id = ?";
                 try (PreparedStatement preparedStatement = connection.prepareStatement(mPathQuery)) {
