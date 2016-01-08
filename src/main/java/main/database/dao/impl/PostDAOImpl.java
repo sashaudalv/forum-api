@@ -13,6 +13,8 @@ import java.util.Arrays;
  */
 public class PostDAOImpl implements PostDAO {
 
+    private static final int BASE_36 = 36;
+
     private final Connection connection;
 
     public PostDAOImpl(Connection connection) {
@@ -62,7 +64,7 @@ public class PostDAOImpl implements PostDAO {
     }
 
     @Override
-    public String create(String jsonString) { // TODO: MAKE IT WITH MATERIALIZED PATH
+    public String create(String jsonString) {
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
 
         if (!object.has("isApproved")) {
@@ -106,6 +108,37 @@ public class PostDAOImpl implements PostDAO {
                     resultSet.next();
                     postId = resultSet.getInt(1);
                 }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String mPath = "";
+
+        if (object.has("parent")) {
+            try {
+                String mPathQuery = "SELECT mpath FROM post WHERE id = ?";
+                try (PreparedStatement preparedStatement = connection.prepareStatement(mPathQuery)) {
+                    preparedStatement.setInt(1, object.get("parent").getAsInt());
+                    try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                        resultSet.next();
+                        mPath = resultSet.getString(1);
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+        mPath += '/';
+        mPath += Integer.toString(postId, BASE_36);
+
+        try {
+            String mPathUpdateQuery = "UPDATE post SET mpath = ? WHERE id = ?";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(mPathUpdateQuery)) {
+                preparedStatement.setString(1, mPath);
+                preparedStatement.setInt(2, postId);
+                preparedStatement.execute();
             }
         } catch (SQLException e) {
             e.printStackTrace();

@@ -134,9 +134,6 @@ public class ThreadDAOImpl implements ThreadDAO {
 
     @Override
     public String listPosts(int threadId, String since, Integer limit, String sort, String order) {
-        // TODO: MAKE IT WITH MATERIALIZED PATH!!!
-        // TODO: dec2base: Integer.toString(Integer.parseInt(number, base1), base2)
-
         JsonArray array = new JsonArray();
         StringBuilder queryBuilder = new StringBuilder();
 
@@ -160,6 +157,33 @@ public class ThreadDAOImpl implements ThreadDAO {
                 queryBuilder.append(" LIMIT ?");
             }
             queryBuilder.append(';');
+        } else {
+            String rootQuery = "SELECT mpath FROM post WHERE parent IS NULL AND thread = ? ";
+            if (since != null) {
+                rootQuery += "AND date >= ? ";
+            }
+            if (limit != null) {
+                rootQuery += "LIMIT ?";
+            }
+            queryBuilder.append("SELECT * FROM (");
+            queryBuilder.append(rootQuery);
+            queryBuilder.append(") AS root ");
+            queryBuilder.append("INNER JOIN post AS child ON child.mpath LIKE CONCAT(root.mpath, \'%\') ");
+            if (order != null) {
+                queryBuilder.append("ORDER BY root.mpath ");
+                switch (order) {
+                    case "asc": queryBuilder.append("ASC"); break;
+                    case "desc": queryBuilder.append("DESC"); break;
+                    default: queryBuilder.append("DESC");
+                }
+            } else {
+                queryBuilder.append("ORDER BY root.mpath DESC");
+            }
+            queryBuilder.append(", child.mpath ASC ");
+            if (limit != null && Objects.equals(sort, "tree")) {
+                queryBuilder.append("LIMIT ?");
+            }
+            queryBuilder.append(';');
         }
 
         try {
@@ -171,6 +195,9 @@ public class ThreadDAOImpl implements ThreadDAO {
                 }
                 if (limit != null) {
                     preparedStatement.setInt(++parameterIndex, limit);
+                    if (Objects.equals(sort, "tree")) {
+                        preparedStatement.setInt(++parameterIndex, limit);
+                    }
                 }
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     while (resultSet.next()) {
