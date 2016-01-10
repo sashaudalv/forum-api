@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
-import java.sql.Connection;
+import javax.sql.DataSource;
 import java.util.Arrays;
 
 /**
@@ -18,13 +18,13 @@ import java.util.Arrays;
 public class ThreadController {
 
     @Autowired
-    private Connection connection;
+    private DataSource dataSource;
 
     private ThreadDAO threadDAO;
 
     @PostConstruct
     void init() {
-        threadDAO = new ThreadDAOImpl(connection);
+        threadDAO = new ThreadDAOImpl(dataSource);
     }
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)
@@ -35,6 +35,9 @@ public class ThreadController {
     @RequestMapping(value = "/details", method = RequestMethod.GET)
     public SimpleStringResponse details(@RequestParam(value = "thread", required = true) int threadId,
                                         @RequestParam(value = "related", required = false) String[] related) {
+        if (threadId < 1) {
+            return new SimpleStringResponse(1);
+        }
         if (related != null && Arrays.asList(related).contains("thread")) {
             return new SimpleStringResponse(3);
         }

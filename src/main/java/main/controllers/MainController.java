@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
-import java.sql.Connection;
+import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,7 +28,7 @@ import java.util.Map;
 public class MainController {
 
     @Autowired
-    private Connection connection;
+    private DataSource dataSource;
 
     private UserDAO userDAO;
     private ForumDAO forumDAO;
@@ -37,10 +37,10 @@ public class MainController {
 
     @PostConstruct
     void init() {
-        userDAO = new UserDAOImpl(connection);
-        forumDAO = new ForumDAOImpl(connection);
-        threadDAO = new ThreadDAOImpl(connection);
-        postDAO = new PostDAOImpl(connection);
+        userDAO = new UserDAOImpl(dataSource);
+        forumDAO = new ForumDAOImpl(dataSource);
+        threadDAO = new ThreadDAOImpl(dataSource);
+        postDAO = new PostDAOImpl(dataSource);
     }
 
     @RequestMapping(value = "/status", method = RequestMethod.GET)

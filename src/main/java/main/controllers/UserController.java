@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
-import java.sql.Connection;
+import javax.sql.DataSource;
 
 /**
  * alex on 03.01.16.
@@ -19,13 +19,13 @@ import java.sql.Connection;
 public class UserController {
 
     @Autowired
-    private Connection connection;
+    private DataSource dataSource;
 
     private UserDAO userDAO;
 
     @PostConstruct
     void init() {
-        userDAO = new UserDAOImpl(connection);
+        userDAO = new UserDAOImpl(dataSource);
     }
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)

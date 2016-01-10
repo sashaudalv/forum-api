@@ -6,10 +6,8 @@ import com.google.gson.JsonParser;
 import main.database.dao.ForumDAO;
 import main.database.executor.TExecutor;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import javax.sql.DataSource;
+import java.sql.*;
 import java.util.Arrays;
 
 /**
@@ -17,15 +15,15 @@ import java.util.Arrays;
  */
 public class ForumDAOImpl implements ForumDAO {
 
-    private final Connection connection;
+    private final DataSource dataSource;
 
-    public ForumDAOImpl(Connection connection) {
-        this.connection = connection;
+    public ForumDAOImpl(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     @Override
     public int getCount() {
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             String query = "SELECT COUNT(*) FROM forum;";
             return TExecutor.execQuery(connection, query, resultSet -> {
                 resultSet.next();
@@ -39,7 +37,7 @@ public class ForumDAOImpl implements ForumDAO {
 
     @Override
     public void truncateTable() {
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 0;");
             TExecutor.execQuery(connection, "TRUNCATE TABLE forum;");
             TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 1;");
@@ -52,26 +50,34 @@ public class ForumDAOImpl implements ForumDAO {
     public String create(String jsonString) {
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
 
-        try {
+        int forumId = -1;
+
+        try (Connection connection = dataSource.getConnection()) {
             String query = "INSERT INTO forum (name, short_name, user) VALUES (?,?,?)";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
                 preparedStatement.setString(1, object.get("name").getAsString());
                 preparedStatement.setString(2, object.get("short_name").getAsString());
                 preparedStatement.setString(3, object.get("user").getAsString());
                 preparedStatement.execute();
+                try (ResultSet resultSet = preparedStatement.getGeneratedKeys()) {
+                    if (resultSet.next()) {
+                        forumId = resultSet.getInt(1);
+                    }
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        return details(object.get("short_name").getAsString(), null);
+        object.addProperty("id", forumId);
+        return object.toString();
     }
 
     @Override
     public String details(String forum, String[] related) {
         JsonObject object = new JsonObject();
 
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             String query = "SELECT * FROM forum WHERE short_name = ?";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, forum);
@@ -81,20 +87,19 @@ public class ForumDAOImpl implements ForumDAO {
                     object.addProperty("name", resultSet.getString("name"));
                     object.addProperty("short_name", resultSet.getString("short_name"));
                     object.addProperty("user", resultSet.getString("user"));
+                    if (related != null) {
+                        if (Arrays.asList(related).contains("user")) {
+                            object.add("user",
+                                    new JsonParser().parse(
+                                            new UserDAOImpl(dataSource).details(object.get("user").getAsString())
+                                    ).getAsJsonObject()
+                            );
+                        }
+                    }
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-        }
-
-        if (related != null) {
-            if (Arrays.asList(related).contains("user")) {
-                object.add("user",
-                        new JsonParser().parse(
-                                new UserDAOImpl(connection).details(object.get("user").getAsString())
-                        ).getAsJsonObject()
-                );
-            }
         }
 
         return object.toString();
@@ -104,26 +109,33 @@ public class ForumDAOImpl implements ForumDAO {
     public String listPosts(String forum, String since, Integer limit, String order, String[] related) {
         JsonArray array = new JsonArray();
         StringBuilder queryBuilder = new StringBuilder();
+
         queryBuilder.append("SELECT * FROM post ");
         queryBuilder.append("WHERE forum = ?");
         if (since != null) {
             queryBuilder.append(" AND date >= ?");
         }
+        queryBuilder.append(" ORDER BY date ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY date ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY date DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, forum);
@@ -145,7 +157,7 @@ public class ForumDAOImpl implements ForumDAO {
                         object.addProperty("points", likes - dislikes);
                         object.addProperty("forum", resultSet.getString("forum"));
                         object.addProperty("message", resultSet.getString("message"));
-                        object.addProperty("parent", (Integer)resultSet.getObject("parent"));
+                        object.addProperty("parent", (Integer) resultSet.getObject("parent"));
                         object.addProperty("thread", resultSet.getInt("thread"));
                         object.addProperty("id", resultSet.getInt("id"));
                         object.addProperty("user", resultSet.getString("user"));
@@ -158,7 +170,7 @@ public class ForumDAOImpl implements ForumDAO {
                             if (Arrays.asList(related).contains("user")) {
                                 object.add("user",
                                         new JsonParser().parse(
-                                                new UserDAOImpl(connection).details(object.get("user").getAsString())
+                                                new UserDAOImpl(dataSource).details(object.get("user").getAsString())
                                         ).getAsJsonObject()
                                 );
                             }
@@ -172,7 +184,7 @@ public class ForumDAOImpl implements ForumDAO {
                             if (Arrays.asList(related).contains("thread")) {
                                 object.add("thread",
                                         new JsonParser().parse(
-                                                new ThreadDAOImpl(connection).details(object.get("thread").getAsInt(), null)
+                                                new ThreadDAOImpl(dataSource).details(object.get("thread").getAsInt(), null)
                                         ).getAsJsonObject()
                                 );
                             }
@@ -192,26 +204,33 @@ public class ForumDAOImpl implements ForumDAO {
     public String listThreads(String forum, String since, Integer limit, String order, String[] related) {
         JsonArray array = new JsonArray();
         StringBuilder queryBuilder = new StringBuilder();
+
         queryBuilder.append("SELECT * FROM thread ");
         queryBuilder.append("WHERE forum = ?");
         if (since != null) {
             queryBuilder.append(" AND date >= ?");
         }
+        queryBuilder.append(" ORDER BY date ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY date ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY date DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, forum);
@@ -243,7 +262,7 @@ public class ForumDAOImpl implements ForumDAO {
                             if (Arrays.asList(related).contains("user")) {
                                 object.add("user",
                                         new JsonParser().parse(
-                                                new UserDAOImpl(connection).details(object.get("user").getAsString())
+                                                new UserDAOImpl(dataSource).details(object.get("user").getAsString())
                                         ).getAsJsonObject()
                                 );
                             }
@@ -255,7 +274,7 @@ public class ForumDAOImpl implements ForumDAO {
                                 );
                             }
                         }
-                        object.addProperty("posts", new PostDAOImpl(connection).getCount(object.get("id").getAsInt()));
+                        object.addProperty("posts", new PostDAOImpl(dataSource).getCount(object.get("id").getAsInt()));
                         array.add(object);
                     }
                 }
@@ -270,29 +289,36 @@ public class ForumDAOImpl implements ForumDAO {
     @Override
     public String listUsers(String forum, Integer sinceId, Integer limit, String order) {
         JsonArray array = new JsonArray();
-
         StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("SELECT DISTINCT u.* FROM user u ");
-        queryBuilder.append("INNER JOIN post p ON u.email = p.user ");
-        queryBuilder.append("WHERE p.forum = ?");
+
+        queryBuilder.append("SELECT * FROM user ");
+        queryBuilder.append("WHERE email IN (");
+        queryBuilder.append("SELECT DISTINCT user FROM post WHERE forum = ?");
+        queryBuilder.append(')');
         if (sinceId != null) {
-            queryBuilder.append(" AND u.id >= ?");
+            queryBuilder.append(" AND id >= ?");
         }
+        queryBuilder.append(" ORDER BY name ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
-                case "asc": queryBuilder.append("ASC"); break;
-                case "desc": queryBuilder.append("DESC"); break;
-                default: queryBuilder.append("DESC");
+                case "asc":
+                    queryBuilder.append("ASC");
+                    break;
+                case "desc":
+                    queryBuilder.append("DESC");
+                    break;
+                default:
+                    queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY u.name DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, forum);
@@ -312,9 +338,9 @@ public class ForumDAOImpl implements ForumDAO {
                         object.addProperty("email", email);
                         object.addProperty("about", resultSet.getString("about"));
                         object.addProperty("isAnonymous", resultSet.getBoolean("isAnonymous"));
-                        object.add("followers", new UserDAOImpl(connection).getFollowers(email));
-                        object.add("following", new UserDAOImpl(connection).getFollowing(email));
-                        object.add("subscriptions", new UserDAOImpl(connection).getSubscriptions(email));
+                        object.add("followers", new UserDAOImpl(dataSource).getFollowers(connection, email));
+                        object.add("following", new UserDAOImpl(dataSource).getFollowing(connection, email));
+                        object.add("subscriptions", new UserDAOImpl(dataSource).getSubscriptions(connection, email));
                         array.add(object);
                     }
                 }

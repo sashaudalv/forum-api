@@ -6,10 +6,8 @@ import com.google.gson.JsonParser;
 import main.database.dao.UserDAO;
 import main.database.executor.TExecutor;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import javax.sql.DataSource;
+import java.sql.*;
 
 /**
  * alex on 03.01.16.
@@ -18,20 +16,22 @@ public class UserDAOImpl implements UserDAO {
 
     private static final int MYSQL_DUPLICATE_PK = 1062;
 
-    private final Connection connection;
+    private final DataSource dataSource;
 
-    public UserDAOImpl(Connection connection) {
-        this.connection = connection;
+    public UserDAOImpl(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     @Override
     public int getCount() {
         try {
-            String query = "SELECT COUNT(*) FROM user;";
-            return TExecutor.execQuery(connection, query, resultSet -> {
-                resultSet.next();
-                return resultSet.getInt(1);
-            });
+            try (Connection connection = dataSource.getConnection()) {
+                String query = "SELECT COUNT(*) FROM user;";
+                return TExecutor.execQuery(connection, query, resultSet -> {
+                    resultSet.next();
+                    return resultSet.getInt(1);
+                });
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -41,10 +41,12 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public void truncateTable() {
         try {
-            TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 0;");
-            TExecutor.execQuery(connection, "TRUNCATE TABLE user;");
-            TExecutor.execQuery(connection, "TRUNCATE TABLE follow;");
-            TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 1;");
+            try (Connection connection = dataSource.getConnection()) {
+                TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 0;");
+                TExecutor.execQuery(connection, "TRUNCATE TABLE user;");
+                TExecutor.execQuery(connection, "TRUNCATE TABLE follow;");
+                TExecutor.execQuery(connection, "SET FOREIGN_KEY_CHECKS = 1;");
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -58,15 +60,22 @@ public class UserDAOImpl implements UserDAO {
             object.addProperty("isAnonymous", false);
         }
 
-        try {
+        int userId = -1;
+
+        try (Connection connection = dataSource.getConnection()) {
             String query = "INSERT INTO user (username, about, name, email, isAnonymous) VALUES (?,?,?,?,?)";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
                 preparedStatement.setString(1, object.get("username").isJsonNull() ? null : object.get("username").getAsString());
                 preparedStatement.setString(2, object.get("about").isJsonNull() ? null : object.get("about").getAsString());
                 preparedStatement.setString(3, object.get("name").isJsonNull() ? null : object.get("name").getAsString());
                 preparedStatement.setString(4, object.get("email").getAsString());
                 preparedStatement.setBoolean(5, object.get("isAnonymous").getAsBoolean());
                 preparedStatement.execute();
+                try (ResultSet resultSet = preparedStatement.getGeneratedKeys()) {
+                    if (resultSet.next()) {
+                        userId = resultSet.getInt(1);
+                    }
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -74,95 +83,89 @@ public class UserDAOImpl implements UserDAO {
                 return null;
             }
         }
-        return details(object.get("email").getAsString());
+
+        object.addProperty("id", userId);
+        return object.toString();
     }
 
     @Override
     public String details(String email) {
         JsonObject object = new JsonObject();
 
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             String query = "SELECT * FROM user WHERE email = ?";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, email);
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    resultSet.next();
-                    object.addProperty("id", resultSet.getInt("id"));
-                    object.addProperty("name", resultSet.getString("name"));
-                    object.addProperty("username", resultSet.getString("username"));
-                    object.addProperty("email", resultSet.getString("email"));
-                    object.addProperty("about", resultSet.getString("about"));
-                    object.addProperty("isAnonymous", resultSet.getBoolean("isAnonymous"));
+                    if (resultSet.next()) {
+                        object.addProperty("id", resultSet.getInt("id"));
+                        object.addProperty("name", resultSet.getString("name"));
+                        object.addProperty("username", resultSet.getString("username"));
+                        object.addProperty("email", resultSet.getString("email"));
+                        object.addProperty("about", resultSet.getString("about"));
+                        object.addProperty("isAnonymous", resultSet.getBoolean("isAnonymous"));
+                    }
                 }
             }
+
+            object.add("followers", getFollowers(connection, email));
+            object.add("following", getFollowing(connection, email));
+            object.add("subscriptions", getSubscriptions(connection, email));
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
-        object.add("followers", getFollowers(email));
-        object.add("following", getFollowing(email));
-        object.add("subscriptions", getSubscriptions(email));
 
         return object.toString();
     }
 
-    public JsonArray getFollowers(String email) {
+    public JsonArray getFollowers(Connection connection, String email) throws SQLException {
         JsonArray array = new JsonArray();
-        try {
-            String query = "SELECT follower FROM follow WHERE followee = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setString(1, email);
-                try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    while (resultSet.next()) {
-                        array.add(resultSet.getString("follower"));
-                    }
+
+        String query = "SELECT follower FROM follow WHERE followee = ?";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setString(1, email);
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                while (resultSet.next()) {
+                    array.add(resultSet.getString("follower"));
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return array;
     }
 
-    public JsonArray getFollowing(String email) {
+    public JsonArray getFollowing(Connection connection, String email) throws SQLException {
         JsonArray array = new JsonArray();
-        try {
-            String query = "SELECT followee FROM follow WHERE follower = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setString(1, email);
-                try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    while (resultSet.next()) {
-                        array.add(resultSet.getString("followee"));
-                    }
+
+        String query = "SELECT followee FROM follow WHERE follower = ?";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setString(1, email);
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                while (resultSet.next()) {
+                    array.add(resultSet.getString("followee"));
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return array;
     }
 
-    public JsonArray getSubscriptions(String email) {
+    public JsonArray getSubscriptions(Connection connection, String email) throws SQLException {
         JsonArray array = new JsonArray();
-        try {
-            String query = "SELECT thread FROM subscribe WHERE user = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setString(1, email);
-                try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    while (resultSet.next()) {
-                        array.add(resultSet.getInt("thread"));
-                    }
+
+        String query = "SELECT thread FROM subscribe WHERE user = ?";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setString(1, email);
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                while (resultSet.next()) {
+                    array.add(resultSet.getInt("thread"));
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return array;
     }
 
     @Override
     public void follow(String follower, String followee) {
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             String query = "INSERT INTO follow (follower, followee) VALUES (?,?)";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, follower);
@@ -177,11 +180,13 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public void unfollow(String follower, String followee) {
         try {
-            String query = "DELETE FROM follow WHERE follower = ? AND followee = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-                preparedStatement.setString(1, follower);
-                preparedStatement.setString(2, followee);
-                preparedStatement.execute();
+            try (Connection connection = dataSource.getConnection()) {
+                String query = "DELETE FROM follow WHERE follower = ? AND followee = ?";
+                try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                    preparedStatement.setString(1, follower);
+                    preparedStatement.setString(2, followee);
+                    preparedStatement.execute();
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -191,6 +196,7 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public String listFollowers(String email, Integer limit, String order, Integer sinceId) {
         JsonArray array = new JsonArray();
+
         StringBuilder queryBuilder = new StringBuilder();
         queryBuilder.append("SELECT u.* FROM user u ");
         queryBuilder.append("INNER JOIN follow f ON u.email = f.follower ");
@@ -198,8 +204,8 @@ public class UserDAOImpl implements UserDAO {
         if (sinceId != null) {
             queryBuilder.append(" AND u.id >= ?");
         }
+        queryBuilder.append(" ORDER BY u.name ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
                 case "asc":
                     queryBuilder.append("ASC");
@@ -211,13 +217,14 @@ public class UserDAOImpl implements UserDAO {
                     queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY u.name DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, email);
@@ -237,9 +244,9 @@ public class UserDAOImpl implements UserDAO {
                         object.addProperty("email", followerEmail);
                         object.addProperty("about", resultSet.getString("about"));
                         object.addProperty("isAnonymous", resultSet.getBoolean("isAnonymous"));
-                        object.add("followers", getFollowers(followerEmail));
-                        object.add("following", getFollowing(followerEmail));
-                        object.add("subscriptions", getSubscriptions(followerEmail));
+                        object.add("followers", getFollowers(connection, followerEmail));
+                        object.add("following", getFollowing(connection, followerEmail));
+                        object.add("subscriptions", getSubscriptions(connection, followerEmail));
                         array.add(object);
                     }
                 }
@@ -261,8 +268,8 @@ public class UserDAOImpl implements UserDAO {
         if (sinceId != null) {
             queryBuilder.append(" AND u.id >= ?");
         }
+        queryBuilder.append(" ORDER BY u.name ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY u.name ");
             switch (order) {
                 case "asc":
                     queryBuilder.append("ASC");
@@ -274,13 +281,14 @@ public class UserDAOImpl implements UserDAO {
                     queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY u.name DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, email);
@@ -300,9 +308,9 @@ public class UserDAOImpl implements UserDAO {
                         object.addProperty("email", followeeEmail);
                         object.addProperty("about", resultSet.getString("about"));
                         object.addProperty("isAnonymous", resultSet.getBoolean("isAnonymous"));
-                        object.add("followers", getFollowers(followeeEmail));
-                        object.add("following", getFollowing(followeeEmail));
-                        object.add("subscriptions", getSubscriptions(followeeEmail));
+                        object.add("followers", getFollowers(connection, followeeEmail));
+                        object.add("following", getFollowing(connection, followeeEmail));
+                        object.add("subscriptions", getSubscriptions(connection, followeeEmail));
                         array.add(object);
                     }
                 }
@@ -323,8 +331,8 @@ public class UserDAOImpl implements UserDAO {
         if (since != null) {
             queryBuilder.append(" AND date >= ?");
         }
+        queryBuilder.append(" ORDER BY date ");
         if (order != null) {
-            queryBuilder.append(" ORDER BY date ");
             switch (order) {
                 case "asc":
                     queryBuilder.append("ASC");
@@ -336,13 +344,14 @@ public class UserDAOImpl implements UserDAO {
                     queryBuilder.append("DESC");
             }
         } else {
-            queryBuilder.append(" ORDER BY date DESC");
+            queryBuilder.append("DESC");
         }
         if (limit != null) {
             queryBuilder.append(" LIMIT ?");
         }
         queryBuilder.append(';');
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             try (PreparedStatement preparedStatement = connection.prepareStatement(queryBuilder.toString())) {
                 int parameterIndex = 0;
                 preparedStatement.setString(++parameterIndex, email);
@@ -387,7 +396,8 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public void updateProfile(String jsonString) {
         JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
-        try {
+
+        try (Connection connection = dataSource.getConnection()) {
             String query = "UPDATE user SET about = ?, name = ? WHERE email = ?;";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, object.get("about").getAsString());
