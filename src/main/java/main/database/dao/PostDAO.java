@@ -1,5 +1,7 @@
 package main.database.dao;
 
+import main.models.Response;
+
 /**
  * alex on 03.01.16.
  */
@@ -8,21 +10,22 @@ public interface PostDAO {
 
     void truncateTable();
 
+    @Deprecated
     int getCount(int threadId);
 
-    String create(String jsonString);
+    Response create(String jsonString);
 
-    String details(int postId, String[] related);
+    Response details(int postId, String[] related);
 
-    String listForumPosts(String forum, String since, Integer limit, String order);
+    Response listForumPosts(String forum, String since, Integer limit, String order);
 
-    String listThreadPosts(int threadId, String since, Integer limit, String order);
+    Response listThreadPosts(int threadId, String since, Integer limit, String order);
 
-    String remove(String jsonString);
+    Response remove(String jsonString);
 
-    String restore(String jsonString);
+    Response restore(String jsonString);
 
-    String update(String jsonString);
+    Response update(String jsonString);
 
-    String vote(String jsonString);
+    Response vote(String jsonString);
 }

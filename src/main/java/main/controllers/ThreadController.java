@@ -2,13 +2,12 @@ package main.controllers;
 
 import main.database.dao.ThreadDAO;
 import main.database.dao.impl.ThreadDAOImpl;
-import main.models.SimpleStringResponse;
+import main.models.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
 import javax.sql.DataSource;
-import java.util.Arrays;
 
 /**
  * alex on 05.01.16.
@@ -28,84 +27,78 @@ public class ThreadController {
     }
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)
-    public SimpleStringResponse create(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.create(body));
+    public Response create(@RequestBody String body) {
+        return threadDAO.create(body);
     }
 
     @RequestMapping(value = "/details", method = RequestMethod.GET)
-    public SimpleStringResponse details(@RequestParam(value = "thread", required = true) int threadId,
-                                        @RequestParam(value = "related", required = false) String[] related) {
-        if (threadId < 1) {
-            return new SimpleStringResponse(1);
-        }
-        if (related != null && Arrays.asList(related).contains("thread")) {
-            return new SimpleStringResponse(3);
-        }
-        return new SimpleStringResponse(threadDAO.details(threadId, related));
+    public Response details(@RequestParam(value = "thread", required = true) int threadId,
+                            @RequestParam(value = "related", required = false) String[] related) {
+        return threadDAO.details((int) threadId, related);
     }
 
     @RequestMapping(value = "/list", method = RequestMethod.GET, params = {"user"})
-    public SimpleStringResponse listUserThreads(@RequestParam(value = "user", required = true) String user,
-                                                @RequestParam(value = "since", required = false) String since,
-                                                @RequestParam(value = "limit", required = false) Integer limit,
-                                                @RequestParam(value = "order", required = false) String order) {
-        return new SimpleStringResponse(threadDAO.listUserThreads(user, since, limit, order));
+    public Response listUserThreads(@RequestParam(value = "user", required = true) String user,
+                                    @RequestParam(value = "since", required = false) String since,
+                                    @RequestParam(value = "limit", required = false) Integer limit,
+                                    @RequestParam(value = "order", required = false) String order) {
+        return threadDAO.listUserThreads(user, since, limit, order);
     }
 
     @RequestMapping(value = "/list", method = RequestMethod.GET, params = {"forum"})
-    public SimpleStringResponse listForumThreads(@RequestParam(value = "forum", required = true) String forum,
-                                                 @RequestParam(value = "since", required = false) String since,
-                                                 @RequestParam(value = "limit", required = false) Integer limit,
-                                                 @RequestParam(value = "order", required = false) String order) {
-        return new SimpleStringResponse(threadDAO.listForumThreads(forum, since, limit, order));
+    public Response listForumThreads(@RequestParam(value = "forum", required = true) String forum,
+                                     @RequestParam(value = "since", required = false) String since,
+                                     @RequestParam(value = "limit", required = false) Integer limit,
+                                     @RequestParam(value = "order", required = false) String order) {
+        return threadDAO.listForumThreads(forum, since, limit, order);
     }
 
     @RequestMapping(value = "/listPosts", method = RequestMethod.GET)
-    public SimpleStringResponse listPosts(@RequestParam(value = "thread", required = true) int threadId,
-                                          @RequestParam(value = "since", required = false) String since,
-                                          @RequestParam(value = "limit", required = false) Integer limit,
-                                          @RequestParam(value = "sort", required = false) String sort,
-                                          @RequestParam(value = "order", required = false) String order) {
-        return new SimpleStringResponse(threadDAO.listPosts(threadId, since, limit, sort, order));
+    public Response listPosts(@RequestParam(value = "thread", required = true) int threadId,
+                              @RequestParam(value = "since", required = false) String since,
+                              @RequestParam(value = "limit", required = false) Integer limit,
+                              @RequestParam(value = "sort", required = false) String sort,
+                              @RequestParam(value = "order", required = false) String order) {
+        return threadDAO.listPosts((int) threadId, since, limit, sort, order);
     }
 
     @RequestMapping(value = "/remove", method = RequestMethod.POST)
-    public SimpleStringResponse remove(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.remove(body));
+    public Response remove(@RequestBody String body) {
+        return threadDAO.remove(body);
     }
 
     @RequestMapping(value = "/restore", method = RequestMethod.POST)
-    public SimpleStringResponse restore(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.restore(body));
+    public Response restore(@RequestBody String body) {
+        return threadDAO.restore(body);
     }
 
     @RequestMapping(value = "/update", method = RequestMethod.POST)
-    public SimpleStringResponse update(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.update(body));
+    public Response update(@RequestBody String body) {
+        return threadDAO.update(body);
     }
 
     @RequestMapping(value = "/vote", method = RequestMethod.POST)
-    public SimpleStringResponse vote(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.vote(body));
+    public Response vote(@RequestBody String body) {
+        return threadDAO.vote(body);
     }
 
     @RequestMapping(value = "/subscribe", method = RequestMethod.POST)
-    public SimpleStringResponse subscribe(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.subscribe(body));
+    public Response subscribe(@RequestBody String body) {
+        return threadDAO.subscribe(body);
     }
 
     @RequestMapping(value = "/unsubscribe", method = RequestMethod.POST)
-    public SimpleStringResponse unsubscribe(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.unsubscribe(body));
+    public Response unsubscribe(@RequestBody String body) {
+        return threadDAO.unsubscribe(body);
     }
 
     @RequestMapping(value = "/open", method = RequestMethod.POST)
-    public SimpleStringResponse open(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.open(body));
+    public Response open(@RequestBody String body) {
+        return threadDAO.open(body);
     }
 
     @RequestMapping(value = "/close", method = RequestMethod.POST)
-    public SimpleStringResponse close(@RequestBody String body) {
-        return new SimpleStringResponse(threadDAO.close(body));
+    public Response close(@RequestBody String body) {
+        return threadDAO.close(body);
     }
 }

@@ -1,10 +1,8 @@
 package main.controllers;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import main.database.dao.UserDAO;
 import main.database.dao.impl.UserDAOImpl;
-import main.models.SimpleStringResponse;
+import main.models.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,67 +27,51 @@ public class UserController {
     }
 
     @RequestMapping(value = "/create", method = RequestMethod.POST)
-    public SimpleStringResponse create(@RequestBody String body){
-        String ret = userDAO.create(body);
-        if (ret == null) {
-            return new SimpleStringResponse(5);
-        } else {
-            return new SimpleStringResponse(ret);
-
-        }
+    public Response create(@RequestBody String body) {
+        return userDAO.create(body);
     }
 
     @RequestMapping(value = "/details", method = RequestMethod.GET)
-    public SimpleStringResponse details(@RequestParam(value = "user") String email){
-        return new SimpleStringResponse(userDAO.details(email));
+    public Response details(@RequestParam(value = "user") String email) {
+        return userDAO.details(email);
     }
 
-    @RequestMapping(value = "/follow", method = RequestMethod.POST  )
-    public SimpleStringResponse follow(@RequestBody String body){
-        JsonObject object = new JsonParser().parse(body).getAsJsonObject();
-        String follower = object.get("follower").getAsString();
-        String followee = object.get("followee").getAsString();
-        userDAO.follow(follower, followee);
-        return new SimpleStringResponse(userDAO.details(follower));
+    @RequestMapping(value = "/follow", method = RequestMethod.POST)
+    public Response follow(@RequestBody String body) {
+        return userDAO.follow(body);
     }
 
     @RequestMapping(value = "/listFollowers", method = RequestMethod.GET)
-    public SimpleStringResponse listFollowers(@RequestParam(value = "user", required = true) String email,
-                              @RequestParam(value = "limit", required = false) Integer limit,
-                              @RequestParam(value = "order", required = false) String order,
-                              @RequestParam(value = "since_id", required = false) Integer sinceId){
-        return new SimpleStringResponse(userDAO.listFollowers(email, limit, order, sinceId));
+    public Response listFollowers(@RequestParam(value = "user", required = true) String email,
+                                  @RequestParam(value = "limit", required = false) Integer limit,
+                                  @RequestParam(value = "order", required = false) String order,
+                                  @RequestParam(value = "since_id", required = false) Integer sinceId) {
+        return userDAO.listFollowers(email, limit, order, sinceId);
     }
 
     @RequestMapping(value = "/listFollowing", method = RequestMethod.GET)
-    public SimpleStringResponse listFollowing(@RequestParam(value = "user", required = true) String email,
-                              @RequestParam(value = "limit", required = false) Integer limit,
-                              @RequestParam(value = "order", required = false) String order,
-                              @RequestParam(value = "since_id", required = false) Integer sinceId){
-        return new SimpleStringResponse(userDAO.listFollowing(email, limit, order, sinceId));
+    public Response listFollowing(@RequestParam(value = "user", required = true) String email,
+                                  @RequestParam(value = "limit", required = false) Integer limit,
+                                  @RequestParam(value = "order", required = false) String order,
+                                  @RequestParam(value = "since_id", required = false) Integer sinceId) {
+        return userDAO.listFollowing(email, limit, order, sinceId);
     }
 
     @RequestMapping(value = "/listPosts", method = RequestMethod.GET)
-    public SimpleStringResponse listPosts(@RequestParam(value = "user", required = true) String email,
-                                          @RequestParam(value = "limit", required = false) Integer limit,
-                                          @RequestParam(value = "order", required = false) String order,
-                                          @RequestParam(value = "since", required = false) String since){
-        return new SimpleStringResponse(userDAO.listPosts(email, limit, order, since));
+    public Response listPosts(@RequestParam(value = "user", required = true) String email,
+                              @RequestParam(value = "limit", required = false) Integer limit,
+                              @RequestParam(value = "order", required = false) String order,
+                              @RequestParam(value = "since", required = false) String since) {
+        return userDAO.listPosts(email, limit, order, since);
     }
 
     @RequestMapping(value = "/unfollow", method = RequestMethod.POST)
-    public SimpleStringResponse unfollow(@RequestBody String body){
-        JsonObject object = new JsonParser().parse(body).getAsJsonObject();
-        String follower = object.get("follower").getAsString();
-        String followee = object.get("followee").getAsString();
-        userDAO.unfollow(follower, followee);
-        return new SimpleStringResponse(userDAO.details(follower));
+    public Response unfollow(@RequestBody String body) {
+        return userDAO.unfollow(body);
     }
 
     @RequestMapping(value = "/updateProfile", method = RequestMethod.POST)
-    public SimpleStringResponse updateProfile(@RequestBody String body){
-        userDAO.updateProfile(body);
-        JsonObject object = new JsonParser().parse(body).getAsJsonObject();
-        return new SimpleStringResponse(userDAO.details(object.get("user").getAsString()));
+    public Response updateProfile(@RequestBody String body) {
+        return userDAO.updateProfile(body);
     }
 }

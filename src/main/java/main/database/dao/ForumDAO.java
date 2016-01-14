@@ -1,5 +1,7 @@
 package main.database.dao;
 
+import main.models.Response;
+
 /**
  * alex on 03.01.16.
  */
@@ -8,13 +10,13 @@ public interface ForumDAO {
 
     void truncateTable();
 
-    String create(String jsonString);
+    Response create(String jsonString);
 
-    String details(String forum, String[] related);
+    Response details(String forum, String[] related);
 
-    String listPosts(String forum, String since, Integer limit, String order, String[] related);
+    Response listPosts(String forum, String since, Integer limit, String order, String[] related);
 
-    String listThreads(String forum, String since, Integer limit, String order, String[] related);
+    Response listThreads(String forum, String since, Integer limit, String order, String[] related);
 
-    String listUsers(String forum, Integer sinceId, Integer limit, String order);
+    Response listUsers(String forum, Integer sinceId, Integer limit, String order);
 }

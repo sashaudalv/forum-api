@@ -4,7 +4,7 @@ USE `forum_api`;
 --
 -- Host: 127.0.0.1    Database: forum_api
 -- ------------------------------------------------------
--- Server version	5.5.41-0ubuntu0.14.04.1-log
+-- Server version	5.5.41-0ubuntu0.14.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -59,6 +59,22 @@ CREATE TABLE `forum` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `forum_user`
+--
+
+DROP TABLE IF EXISTS `forum_user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `forum_user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `forum` varchar(255) NOT NULL,
+  `user` varchar(255) NOT NULL,
+  PRIMARY KEY (`user`,`forum`),
+  KEY `id` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `post`
 --
 
@@ -81,21 +97,89 @@ CREATE TABLE `post` (
   `likes` int(11) NOT NULL DEFAULT '0',
   `dislikes` int(11) NOT NULL DEFAULT '0',
   `mpath` varchar(255) DEFAULT NULL,
+  `root_mpath` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_posts_1_idx` (`user`),
   KEY `fk_posts_2_idx` (`forum`),
   KEY `user_date` (`user`,`date`),
   KEY `fk_posts_3_idx` (`thread`),
   KEY `thread_date` (`thread`,`date`),
-  KEY `mpath` (`mpath`),
-  KEY `thread_parent_date_mpath` (`thread`,`parent`,`date`,`mpath`),
   KEY `forum_date` (`forum`,`date`),
-  KEY `forum_user` (`forum`,`user`),
+  KEY `thread_rootMpath_mpath` (`thread`,`root_mpath`,`mpath`),
   CONSTRAINT `fk_posts_1` FOREIGN KEY (`user`) REFERENCES `user` (`email`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_posts_2` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_posts_4` FOREIGN KEY (`thread`) REFERENCES `thread` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8 */ ;
+/*!50003 SET character_set_results = utf8 */ ;
+/*!50003 SET collation_connection  = utf8_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`user`@`localhost`*/ /*!50003 TRIGGER `post_BINS` BEFORE INSERT ON `post` FOR EACH ROW
+BEGIN
+  DECLARE next_id INT;
+  SET next_id = (SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='post');
+
+  IF (NEW.parent IS NOT NULL) THEN
+	SET NEW.mpath = concat((SELECT IFNULL(mpath,'') FROM post WHERE id = NEW.parent),'/',CONV(next_id,10,36));
+	SET NEW.root_mpath = (SELECT root_mpath FROM post WHERE id = NEW.parent);
+  else
+	SET NEW.root_mpath = CONV(next_id,10,36);
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8 */ ;
+/*!50003 SET character_set_results = utf8 */ ;
+/*!50003 SET collation_connection  = utf8_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`user`@`localhost`*/ /*!50003 TRIGGER `post_AINS` AFTER INSERT ON `post` FOR EACH ROW
+begin
+  IF (NEW.isDeleted = 0) THEN
+	UPDATE thread SET posts = posts + 1 WHERE id = NEW.thread;
+  END IF;
+  INSERT IGNORE INTO forum_user (forum, user) VALUES (NEW.forum, NEW.user);
+end */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8 */ ;
+/*!50003 SET character_set_results = utf8 */ ;
+/*!50003 SET collation_connection  = utf8_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `post_AUPD` AFTER UPDATE ON `post` FOR EACH ROW
+BEGIN
+ IF OLD.isDeleted = false AND NEW.isDeleted = true THEN
+    UPDATE thread SET posts = posts - 1 WHERE thread.id = NEW.thread;
+ ELSEIF OLD.isDeleted = true AND NEW.isDeleted = false THEN
+    UPDATE thread SET posts = posts + 1 WHERE thread.id = NEW.thread;
+ END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `subscribe`
@@ -178,4 +262,4 @@ CREATE TABLE `user` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-01-10  4:09:33
+-- Dump completed on 2016-01-13 19:46:51

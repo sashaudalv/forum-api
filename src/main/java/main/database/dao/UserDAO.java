@@ -1,5 +1,7 @@
 package main.database.dao;
 
+import main.models.Response;
+
 /**
  * alex on 03.01.16.
  */
@@ -8,19 +10,19 @@ public interface UserDAO {
 
     void truncateTable();
 
-    String create(String jsonString);
+    Response create(String jsonString);
 
-    String details(String email);
+    Response details(String email);
 
-    void follow(String follower, String followee);
+    Response follow(String jsonString);
 
-    void unfollow(String follower, String followee);
+    Response unfollow(String jsonString);
 
-    String listFollowers(String email, Integer limit, String order, Integer sinceId);
+    Response listFollowers(String email, Integer limit, String order, Integer sinceId);
 
-    String listFollowing(String email, Integer limit, String order, Integer sinceId);
+    Response listFollowing(String email, Integer limit, String order, Integer sinceId);
 
-    String listPosts(String email, Integer limit, String order, String since);
+    Response listPosts(String email, Integer limit, String order, String since);
 
-    void updateProfile(String jsonString);
+    Response updateProfile(String jsonString);
 }

@@ -1,5 +1,7 @@
 package main.database.dao;
 
+import main.models.Response;
+
 /**
  * alex on 03.01.16.
  */
@@ -8,29 +10,29 @@ public interface ThreadDAO {
 
     void truncateTable();
 
-    String create(String jsonString);
+    Response create(String jsonString);
 
-    String details(int threadId, String[] related);
+    Response details(int threadId, String[] related);
 
-    String listPosts(int threadId, String since, Integer limit, String sort, String order);
+    Response listPosts(int threadId, String since, Integer limit, String sort, String order);
 
-    String listUserThreads(String user, String since, Integer limit, String order);
+    Response listUserThreads(String user, String since, Integer limit, String order);
 
-    String listForumThreads(String forum, String since, Integer limit, String order);
+    Response listForumThreads(String forum, String since, Integer limit, String order);
 
-    String remove(String jsonString);
+    Response remove(String jsonString);
 
-    String restore(String jsonString);
+    Response restore(String jsonString);
 
-    String update(String jsonString);
+    Response update(String jsonString);
 
-    String vote(String jsonString);
+    Response vote(String jsonString);
 
-    String subscribe(String jsonString);
+    Response subscribe(String jsonString);
 
-    String unsubscribe(String jsonString);
+    Response unsubscribe(String jsonString);
 
-    String open(String jsonString);
+    Response open(String jsonString);
 
-    String close(String jsonString);
+    Response close(String jsonString);
 }

@@ -1,9 +1,13 @@
 package main.database.dao.impl;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import main.database.dao.PostDAO;
 import main.database.executor.TExecutor;
+import main.models.PostModel;
+import main.models.Response;
 
 import javax.sql.DataSource;
 import java.sql.*;
@@ -13,8 +17,6 @@ import java.util.Arrays;
  * alex on 03.01.16.
  */
 public class PostDAOImpl implements PostDAO {
-
-    private static final int BASE_36 = 36;
 
     private final DataSource dataSource;
 
@@ -66,96 +68,53 @@ public class PostDAOImpl implements PostDAO {
     }
 
     @Override
-    public String create(String jsonString) {
-        JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
-
-        if (!object.has("isApproved")) {
-            object.addProperty("isApproved", false);
-        }
-        if (!object.has("isHighlighted")) {
-            object.addProperty("isHighlighted", false);
-        }
-        if (!object.has("isEdited")) {
-            object.addProperty("isEdited", false);
-        }
-        if (!object.has("isSpam")) {
-            object.addProperty("isSpam", false);
-        }
-        if (!object.has("isDeleted")) {
-            object.addProperty("isDeleted", false);
-        }
-        if (!object.has("parent")) {
-            object.add("parent", null);
+    public Response create(String jsonString) {
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(jsonString).getAsJsonObject();
+        } catch (JsonSyntaxException e) {
+            return new Response(Response.Codes.INVALID_QUERY);
         }
 
-        int postId = -1;
+        PostModel post;
+        try {
+            post = new PostModel(object);
+        } catch (Exception e) {
+            return new Response(Response.Codes.INCORRECT_QUERY);
+        }
 
         try (Connection connection = dataSource.getConnection()) {
             String query = "INSERT INTO post (date, thread, message, user, forum, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-                preparedStatement.setString(1, object.get("date").getAsString());
-                preparedStatement.setInt(2, object.get("thread").getAsInt());
-                preparedStatement.setString(3, object.get("message").getAsString());
-                preparedStatement.setString(4, object.get("user").getAsString());
-                preparedStatement.setString(5, object.get("forum").getAsString());
-                if (object.get("parent").isJsonNull()) {
-                    preparedStatement.setObject(6, null);
-                } else {
-                    preparedStatement.setInt(6, object.get("parent").getAsInt());
-                }
-                preparedStatement.setBoolean(7, object.get("isApproved").getAsBoolean());
-                preparedStatement.setBoolean(8, object.get("isHighlighted").getAsBoolean());
-                preparedStatement.setBoolean(9, object.get("isEdited").getAsBoolean());
-                preparedStatement.setBoolean(10, object.get("isSpam").getAsBoolean());
-                preparedStatement.setBoolean(11, object.get("isDeleted").getAsBoolean());
+                preparedStatement.setString(1, post.getDate());
+                preparedStatement.setInt(2, (Integer) post.getThread());
+                preparedStatement.setString(3, post.getMessage());
+                preparedStatement.setString(4, (String) post.getUser());
+                preparedStatement.setString(5, (String) post.getForum());
+                preparedStatement.setObject(6, post.getParent());
+                preparedStatement.setBoolean(7, post.getIsApproved());
+                preparedStatement.setBoolean(8, post.getIsHighlighted());
+                preparedStatement.setBoolean(9, post.getIsEdited());
+                preparedStatement.setBoolean(10, post.getIsSpam());
+                preparedStatement.setBoolean(11, post.getIsDeleted());
                 preparedStatement.execute();
                 try (ResultSet resultSet = preparedStatement.getGeneratedKeys()) {
                     if (resultSet.next()) {
-                        postId = resultSet.getInt(1);
+                        post.setId(resultSet.getInt(1));
                     }
                 }
-            }
-
-            String mPath = "";
-
-            if (!object.get("parent").isJsonNull()) {
-                String mPathQuery = "SELECT mpath FROM post WHERE id = ?";
-                try (PreparedStatement preparedStatement = connection.prepareStatement(mPathQuery)) {
-                    preparedStatement.setInt(1, object.get("parent").getAsInt());
-                    try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                        if (resultSet.next()) {
-                            mPath = resultSet.getString(1);
-                        }
-                    }
-                }
-            }
-
-            mPath += '/';
-            mPath += Integer.toString(postId, BASE_36);
-
-            String mPathUpdateQuery = "UPDATE post SET mpath = ? WHERE id = ?";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(mPathUpdateQuery)) {
-                preparedStatement.setString(1, mPath);
-                preparedStatement.setInt(2, postId);
-                preparedStatement.execute();
-            }
-
-            String threadUpdateQuery = "UPDATE thread SET posts = posts + 1 WHERE id = ?;";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(threadUpdateQuery)) {
-                preparedStatement.setInt(1, object.get("thread").getAsInt());
-                preparedStatement.execute();
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.UNKNOWN_ERROR);
         }
 
-        object.addProperty("id", postId);
-        return object.toString();
+        return new Response(post);
     }
 
     @Override
-    public String details(int postId, String[] related) {
-        JsonObject object = new JsonObject();
+    public Response details(int postId, String[] related) {
+        PostModel postModel;
 
         try (Connection connection = dataSource.getConnection()) {
             String query = "SELECT * FROM post WHERE id = ?";
@@ -163,71 +122,49 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(1, postId);
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     if (resultSet.next()) {
-                        String date = resultSet.getString("date");
-                        object.addProperty("date", date.substring(0, date.length() - 2));
-                        int likes = resultSet.getInt("likes");
-                        object.addProperty("likes", likes);
-                        int dislikes = resultSet.getInt("dislikes");
-                        object.addProperty("dislikes", dislikes);
-                        object.addProperty("points", likes - dislikes);
-                        object.addProperty("forum", resultSet.getString("forum"));
-                        object.addProperty("message", resultSet.getString("message"));
-                        object.addProperty("parent", (Integer) resultSet.getObject("parent"));
-                        object.addProperty("thread", resultSet.getInt("thread"));
-                        object.addProperty("id", resultSet.getInt("id"));
-                        object.addProperty("user", resultSet.getString("user"));
-                        object.addProperty("isApproved", resultSet.getBoolean("isApproved"));
-                        object.addProperty("isDeleted", resultSet.getBoolean("isDeleted"));
-                        object.addProperty("isEdited", resultSet.getBoolean("isEdited"));
-                        object.addProperty("isHighlighted", resultSet.getBoolean("isHighlighted"));
-                        object.addProperty("isSpam", resultSet.getBoolean("isSpam"));
-                        if (related != null) {
-                            if (Arrays.asList(related).contains("user")) {
-                                object.add("user",
-                                        new JsonParser().parse(
-                                                new UserDAOImpl(dataSource).details(object.get("user").getAsString())
-                                        ).getAsJsonObject()
-                                );
-                            }
-                            if (Arrays.asList(related).contains("forum")) {
-                                object.add("forum",
-                                        new JsonParser().parse(
-                                                new ForumDAOImpl(dataSource).details(object.get("forum").getAsString(), null)
-                                        ).getAsJsonObject()
-                                );
-                            }
-                            if (Arrays.asList(related).contains("thread")) {
-                                object.add("thread",
-                                        new JsonParser().parse(
-                                                new ThreadDAOImpl(dataSource).details(object.get("thread").getAsInt(), null)
-                                        ).getAsJsonObject()
-                                );
-                            }
-                        }
+                        postModel = new PostModel(resultSet);
+                    } else {
+                        return new Response(Response.Codes.NOT_FOUND);
                     }
                 }
-
+            }
+            if (related != null) {
+                if (Arrays.asList(related).contains("user")) {
+                    postModel.setUser(new UserDAOImpl(dataSource).details((String) postModel.getUser()).getResponse());
+                }
+                if (Arrays.asList(related).contains("forum")) {
+                    postModel.setForum(new ForumDAOImpl(dataSource).details((String) postModel.getForum(), null).getResponse());
+                }
+                if (Arrays.asList(related).contains("thread")) {
+                    postModel.setThread(new ThreadDAOImpl(dataSource).details((Integer) postModel.getThread(), null).getResponse());
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.UNKNOWN_ERROR);
         }
 
-        return object.toString();
+        return new Response(postModel);
     }
 
     @Override
-    public String listForumPosts(String forum, String since, Integer limit, String order) {
+    public Response listForumPosts(String forum, String since, Integer limit, String order) {
         return new ForumDAOImpl(dataSource).listPosts(forum, since, limit, order, null);
     }
 
     @Override
-    public String listThreadPosts(int threadId, String since, Integer limit, String order) {
+    public Response listThreadPosts(int threadId, String since, Integer limit, String order) {
         return new ThreadDAOImpl(dataSource).listPosts(threadId, since, limit, null, order);
     }
 
     @Override
-    public String remove(String jsonString) {
-        JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
+    public Response remove(String jsonString) {
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(jsonString).getAsJsonObject();
+        } catch (JsonSyntaxException e) {
+            return new Response(Response.Codes.INVALID_QUERY);
+        }
 
         try (Connection connection = dataSource.getConnection()) {
             String query = "UPDATE post SET isDeleted = 1 WHERE id = ?;";
@@ -235,22 +172,22 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(1, object.get("post").getAsInt());
                 preparedStatement.execute();
             }
-
-            String threadUpdateQuery = "UPDATE thread SET posts = posts - 1 WHERE id = (SELECT thread from post WHERE id = ?);";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(threadUpdateQuery)) {
-                preparedStatement.setInt(1, object.get("post").getAsInt());
-                preparedStatement.execute();
-            }
-        } catch (SQLException e) {
+        } catch (SQLException | NullPointerException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.INCORRECT_QUERY);
         }
 
-        return object.toString();
+        return new Response(new Gson().fromJson(object, Object.class));
     }
 
     @Override
-    public String restore(String jsonString) {
-        JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
+    public Response restore(String jsonString) {
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(jsonString).getAsJsonObject();
+        } catch (JsonSyntaxException e) {
+            return new Response(Response.Codes.INVALID_QUERY);
+        }
 
         try (Connection connection = dataSource.getConnection()) {
             String query = "UPDATE post SET isDeleted = 0 WHERE id = ?";
@@ -258,22 +195,22 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(1, object.get("post").getAsInt());
                 preparedStatement.execute();
             }
-
-            String threadUpdateQuery = "UPDATE thread SET posts = posts + 1 WHERE id = (SELECT thread from post WHERE id = ?);";
-            try (PreparedStatement preparedStatement = connection.prepareStatement(threadUpdateQuery)) {
-                preparedStatement.setInt(1, object.get("post").getAsInt());
-                preparedStatement.execute();
-            }
-        } catch (SQLException e) {
+        } catch (SQLException | NullPointerException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.INCORRECT_QUERY);
         }
 
-        return object.toString();
+        return new Response(new Gson().fromJson(object, Object.class));
     }
 
     @Override
-    public String update(String jsonString) {
-        JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
+    public Response update(String jsonString) {
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(jsonString).getAsJsonObject();
+        } catch (JsonSyntaxException e) {
+            return new Response(Response.Codes.INVALID_QUERY);
+        }
 
         try (Connection connection = dataSource.getConnection()) {
             String query = "UPDATE post SET message = ? WHERE id = ?";
@@ -282,16 +219,22 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(2, object.get("post").getAsInt());
                 preparedStatement.execute();
             }
-        } catch (SQLException e) {
+        } catch (SQLException | NullPointerException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.INCORRECT_QUERY);
         }
 
         return details(object.get("post").getAsInt(), null);
     }
 
     @Override
-    public String vote(String jsonString) {
-        JsonObject object = new JsonParser().parse(jsonString).getAsJsonObject();
+    public Response vote(String jsonString) {
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(jsonString).getAsJsonObject();
+        } catch (JsonSyntaxException e) {
+            return new Response(Response.Codes.INVALID_QUERY);
+        }
 
         String likeQuery = "UPDATE post SET likes = likes + 1 WHERE id = ?";
         String dislikeQuery = "UPDATE post SET dislikes = dislikes + 1 WHERE id = ?";
@@ -303,8 +246,9 @@ public class PostDAOImpl implements PostDAO {
                 preparedStatement.setInt(1, object.get("post").getAsInt());
                 preparedStatement.execute();
             }
-        } catch (SQLException e) {
+        } catch (SQLException | NullPointerException e) {
             e.printStackTrace();
+            return new Response(Response.Codes.INCORRECT_QUERY);
         }
 
         return details(object.get("post").getAsInt(), null);
