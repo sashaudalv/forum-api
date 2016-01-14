@@ -183,7 +183,7 @@ public class UserDAOImpl implements UserDAO {
         }
 
         try (Connection connection = dataSource.getConnection()) {
-            String query = "INSERT INTO follow (follower, followee) VALUES (?,?)";
+            String query = "INSERT IGNORE INTO follow (follower, followee) VALUES (?,?)";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, object.get("follower").getAsString());
                 preparedStatement.setString(2, object.get("followee").getAsString());

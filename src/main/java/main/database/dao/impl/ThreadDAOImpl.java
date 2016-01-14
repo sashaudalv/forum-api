@@ -452,18 +452,13 @@ public class ThreadDAOImpl implements ThreadDAO {
         }
 
         try (Connection connection = dataSource.getConnection()) {
-            String query = "INSERT INTO subscribe (user, thread) VALUES (?,?);";
+            String query = "INSERT IGNORE INTO subscribe (user, thread) VALUES (?,?);";
             try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
                 preparedStatement.setString(1, object.get("user").getAsString());
                 preparedStatement.setInt(2, object.get("thread").getAsInt());
                 preparedStatement.execute();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            if (e.getErrorCode() != MYSQL_DUPLICATE_PK) {
-                return new Response(Response.Codes.INCORRECT_QUERY);
-            }
-        } catch (NullPointerException e) {
+        } catch (SQLException | NullPointerException e) {
             e.printStackTrace();
             return new Response(Response.Codes.INCORRECT_QUERY);
         }
