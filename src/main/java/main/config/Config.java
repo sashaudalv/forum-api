@@ -1,53 +1,34 @@
 package main.config;
 
-import org.apache.commons.dbcp.ConnectionFactory;
-import org.apache.commons.dbcp.DriverManagerConnectionFactory;
-import org.apache.commons.dbcp.PoolableConnectionFactory;
-import org.apache.commons.dbcp.PoolingDataSource;
-import org.apache.commons.pool.impl.GenericObjectPool;
+import org.apache.commons.dbcp.BasicDataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.core.env.Environment;
 
+import javax.annotation.Resource;
 import javax.sql.DataSource;
 
 /**
  * alex on 03.01.16.
  */
 @Configuration
+@PropertySource("classpath:db.properties")
 public class Config {
 
-    private static DataSource dataSource;
+    @Resource
+    private Environment env;
 
     @Bean
     public DataSource getDataSource() {
-        if (dataSource != null) {
-            return dataSource;
-        }
-
-        try {
-            Class.forName("com.mysql.jdbc.Driver").newInstance();
-        } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("jdbc:mysql://localhost:3306/");
-        builder.append("forum_api?");
-        builder.append("useUnicode=true&characterEncoding=utf8&autoReconnect=true");
-
-        GenericObjectPool genericObjectPool = new GenericObjectPool();
-        genericObjectPool.setMaxActive(100);
-
-        ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(
-                builder.toString(),
-                "user",
-                "password");
-
-        PoolableConnectionFactory poolableConnectionFactory =
-                new PoolableConnectionFactory(connectionFactory, genericObjectPool,
-                        null, null, false, true);
-
-        dataSource = new PoolingDataSource(genericObjectPool);
-        return dataSource;
+        BasicDataSource basicDataSource = new BasicDataSource();
+        basicDataSource.setDriverClassName(env.getProperty("db.driver"));
+        basicDataSource.setUrl(env.getProperty("db.url"));
+        basicDataSource.setUsername(env.getProperty("db.username"));
+        basicDataSource.setPassword(env.getProperty("db.password"));
+        basicDataSource.setMaxActive(Integer.parseInt(env.getProperty("db.max-active")));
+        basicDataSource.setInitialSize(Integer.parseInt(env.getProperty("db.initial-size")));
+        basicDataSource.setValidationQuery(env.getProperty("db.validation-query"));
+        return basicDataSource;
     }
 }
